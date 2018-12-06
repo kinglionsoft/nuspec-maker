@@ -1,6 +1,5 @@
 ﻿using EnvDTE;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.ComponentModel.Design;
 using System.IO;
@@ -107,7 +106,7 @@ namespace NuspecMaker
         private async Task RunAsync()
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            DTE dte = (DTE)await this.ServiceProvider.GetServiceAsync(typeof(DTE));
+            var dte = (DTE)await this.ServiceProvider.GetServiceAsync(typeof(DTE));
             if (dte.Solution == null || dte.Solution.Projects.Count == 0)
             {
                 return;
@@ -120,35 +119,18 @@ namespace NuspecMaker
                 CommandOutput.WriteLine("首次运行，已在解决方案根目录创建 nuspec.config，请更新全局配置后再次运行。");
                 return;
             }
-            var count = dte.Solution.Projects.Count;
-            for (var i = 1; i <= count; i++)
+
+            var projects = Directory.GetFiles(solutionRoot, "*.csproj", SearchOption.AllDirectories);
+            var count = projects.Length;
+            var i = 1;
+            foreach (var fullName in projects)
             {
-                var pj = dte.Solution.Projects.Item(i);
-                var name = pj.Name;
-                var fullName = pj.FullName;
-
-                CommandOutput.WriteLine($"{i}/{count}: 开始更新项目{name}");
-                string projectPath;
-                if (string.IsNullOrEmpty(fullName))
-                {
-                    projectPath = Path.Combine(solutionRoot, name);
-                    if (Directory.Exists(projectPath))
-                    {
-                        CommandOutput.WriteLine($"项目{name}未获取到项目绝对目录，使用相对于解决方案的目录：{projectPath}");
-                    }
-                    else
-                    {
-                        CommandOutput.WriteLine($"项目{name}未获取到项目绝对目录，且相对目录不存在，跳过");
-                        continue;
-                    }
-                }
-                else
-                {
-                    projectPath = Path.GetDirectoryName(fullName);
-                }
-
+                var name = Path.GetFileNameWithoutExtension(fullName);
+                CommandOutput.WriteLine($"{i}/{count}: 开始更新项目{fullName}");
+                var projectPath = Path.GetDirectoryName(fullName);
                 NuspecConfiguration.Make(name, projectPath);
                 CommandOutput.WriteLine();
+                i++;
             }
         }
 
