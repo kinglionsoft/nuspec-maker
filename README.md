@@ -2,7 +2,7 @@
 VS 2017插件，为解决方案下的项目生成.nuspec文件。
 
 ## 安装
-下载并安装 [NuspecMaker.vsix](dist/NuspecMaker.vsix).
+下载并安装 [NuspecMaker.vsix](dist/).
 
 ## 使用
 
