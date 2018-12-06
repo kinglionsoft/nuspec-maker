@@ -15,7 +15,7 @@ namespace NuspecMaker
         private static NuspecOption _nuspecOption;
 
         private const string ConfigFile = "nuspec.config";
-        
+
         public static string SolutionRoot = string.Empty;
 
         private static string Nuget => string.IsNullOrEmpty(_nuspecOption.Nuget)
@@ -35,7 +35,7 @@ namespace NuspecMaker
                 // create default configuration file
                 using (var writer = new StreamWriter(configFilePath, false, Encoding.UTF8))
                 {
-                   writer.WriteLine(JsonConvert.SerializeObject(new NuspecOption(), Formatting.Indented));
+                    writer.WriteLine(JsonConvert.SerializeObject(new NuspecOption(), Formatting.Indented));
                 }
 
                 return false;
@@ -49,9 +49,8 @@ namespace NuspecMaker
             return true;
         }
 
-        private static void Spec(string csproj)
+        private static void Spec(string projectPath)
         {
-            var projectPath = Path.GetDirectoryName(csproj);
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -70,20 +69,20 @@ namespace NuspecMaker
             process.WaitForExit();
             if (process.ExitCode != 0)
             {
-                throw new Exception($"nuget spec失败，文件：{csproj}，结果：{output}");
+                throw new Exception($"nuget spec失败，项目：{projectPath}，结果：{output}");
             }
             CommandOutput.WriteLine("调用nuget spec完成");
         }
-        
+
         /// <summary>
         /// 读取依赖
         /// </summary>
-        /// <param name="csproj"></param>
+        /// <param name="projectPath"></param>
         /// <returns>{ "net471":{"NewtonSoft.Json" : "12.0.1"} }</returns>
-        private static Dictionary<string, Dictionary<string, string>> GetDependencies(string csproj)
+        private static Dictionary<string, Dictionary<string, string>> GetDependencies(string projectPath)
         {
             // get dependencies from obj/project.assets.json
-            var assets = Path.Combine(Path.GetDirectoryName(csproj), "obj", "project.assets.json");
+            var assets = Path.Combine(projectPath, "obj", "project.assets.json");
             if (!File.Exists(assets))
             {
                 throw new FileNotFoundException(assets);
@@ -122,20 +121,20 @@ namespace NuspecMaker
             }
         }
 
-        public static void Make(string projectName, string csproj)
+        public static void Make(string projectName, string projectPath)
         {
-            if (_nuspecOption.MatchIgnore(projectName, csproj))
+            if (_nuspecOption.MatchIgnore(projectName, projectPath))
             {
                 CommandOutput.WriteLine($"{projectName} 满足排除条件，跳过");
                 return;
             }
 
-            var nuspecFile = Path.ChangeExtension(csproj, ".nuspec");
+            var nuspecFile = Path.Combine(projectPath, projectName + ".nuspec");
             var newNuspec = false;
             if (!File.Exists(nuspecFile))
             {
                 CommandOutput.WriteLine($"{nuspecFile}不存在，开始生成");
-                Spec(csproj);
+                Spec(projectPath);
                 newNuspec = true;
             }
             else
@@ -147,7 +146,7 @@ namespace NuspecMaker
             CommandOutput.WriteLine($"开始使用全局配置更新: {nuspecFile}");
             document.Load(nuspecFile);
             var metadata = document["package"]["metadata"];
-            
+
             if (newNuspec)
             {
                 CommandOutput.WriteLine("为新创建的nuspec文件，更新全局配置");
@@ -160,9 +159,9 @@ namespace NuspecMaker
                     }
                 }
             }
-            
+
             var dependList = metadata.GetElementsByTagName("dependencies");
-            var pkgList = GetDependencies(csproj);
+            var pkgList = GetDependencies(projectPath);
             if (pkgList.Count == 0)
             {
                 CommandOutput.WriteLine("没有第三方依赖包");
@@ -180,7 +179,7 @@ namespace NuspecMaker
                 }
                 else
                 {
-                    dependencies = (XmlElement) dependList[0];
+                    dependencies = (XmlElement)dependList[0];
                     dependencies.RemoveAll();
                 }
 

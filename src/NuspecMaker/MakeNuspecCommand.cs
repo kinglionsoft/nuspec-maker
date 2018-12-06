@@ -128,7 +128,26 @@ namespace NuspecMaker
                 var fullName = pj.FullName;
 
                 CommandOutput.WriteLine($"{i}/{count}: 开始更新项目{name}");
-                NuspecConfiguration.Make(name, fullName);
+                string projectPath;
+                if (string.IsNullOrEmpty(fullName))
+                {
+                    projectPath = Path.Combine(solutionRoot, name);
+                    if (Directory.Exists(projectPath))
+                    {
+                        CommandOutput.WriteLine($"项目{name}未获取到项目绝对目录，使用相对于解决方案的目录：{projectPath}");
+                    }
+                    else
+                    {
+                        CommandOutput.WriteLine($"项目{name}未获取到项目绝对目录，且相对目录不存在，跳过");
+                        continue;
+                    }
+                }
+                else
+                {
+                    projectPath = Path.GetDirectoryName(fullName);
+                }
+
+                NuspecConfiguration.Make(name, projectPath);
                 CommandOutput.WriteLine();
             }
         }
