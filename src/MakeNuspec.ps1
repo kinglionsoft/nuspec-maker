@@ -15,10 +15,10 @@ param (
     [string]$requireLicenseAcceptance = "false",
     [string]$ignore = "MigrationBackup",
     [bool]$ignoreError = $false,
-    [string]$slnRoot = ""
+    [string]$slnRoot = "D:\201807_Lib\Lib"
 )
 
-$ignoreList = $ignore.Split(';');
+$ignoreList = $ignore.Split(';')
 
 function MatchIgnore($projectName, $projectPath)
 {
@@ -28,8 +28,7 @@ function MatchIgnore($projectName, $projectPath)
         {
             return $true
         }
-
-        if ($projectPath -match $i)
+        if ( [System.Text.RegularExpressions.Regex]::IsMatch($projectPath, ".*{$i}.*", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
         {
             return $true
         }
@@ -71,22 +70,30 @@ function Get-ObjectMembers {
 function GetDependencies($projectPath) 
 {
     $assets = [IO.Path]::Combine($projectPath,"obj","project.assets.json")
+    if(!(Test-Path $assets))
+    {
+        Write-Host "$assets 不存在，忽略"
+        return
+    }
     $assetsJObject = Get-Content -Raw -Path $assets | ConvertFrom-Json
     
     [hashtable]$depends = @{}
     $assetsJObject.project.frameworks | Get-ObjectMembers | foreach {
-        $net = $_.Key
-        [hashtable]$packages = @{}
-        $_.Value.dependencies | foreach {
-            $_ | Get-ObjectMembers | foreach {
-                $pkg = $_.Key
-                if($_.Value.target -eq "Package") {
-                    $version = $_.Value.version.Substring(1, $_.Value.version.IndexOf(',') - 1)
-                    $packages[$pkg]=$version
+        if($_.Value.dependencies) 
+        {
+            $net = $_.Key
+            [hashtable]$packages = @{}
+            $_.Value.dependencies | foreach {
+                $_ | Get-ObjectMembers | foreach {
+                    $pkg = $_.Key
+                    if($_.Value.target -eq "Package") {
+                        $version = $_.Value.version.Substring(1, $_.Value.version.IndexOf(',') - 1)
+                        $packages[$pkg]=$version
+                    }
                 }
             }
+            $depends[$net] = $packages
         }
-        $depends[$net] = $packages
     }
     return $depends
 }
@@ -113,7 +120,8 @@ function GetVersion($projectName, $projectPath)
 
         foreach($line in (Get-Content $csproj | where { $_ -match "<Version>.*</Version>" }))
         {
-            $version = $line.Substring(10, $line.Length - 20)
+            $line = $line.Trim()
+            $version = $line.Trim().Substring(9, $line.Length - 19)
             return $version
         }
     }
@@ -139,16 +147,27 @@ function Make($projectName, $projectPath)
          Write-Host "开始使用全局配置更新：$nuspecFile"
          $metadata.authors = $authors
          $metadata.owners = $owners
-         $metadata.licenseUrl = $licenseUrl
+         $metadata.license = $licenseUrl
          $metadata.projectUrl = $projectUrl
          $metadata.iconUrl = $iconUrl
          $metadata.copyright = $copyright
          $metadata.requireLicenseAcceptance = $requireLicenseAcceptance
-         if($metadata.releaseNotes -eq "Summary of changes made in this release of the package.")
-         {
-            $metadata.releaseNotes = "`$description`$"
-         }
+         
     }
+    $newVersion = GetVersion $projectName $projectPath
+    Write-Host "开始更新版本：$newVersion"
+    $metadata.id = $projectName
+    $metadata.title = $projectName
+    $metadata.version = $newVersion
+    if($metadata.description -eq "`$description`$")
+    {
+        $metadata.description = $projectName
+    }
+    if(($metadata.releaseNotes -eq "Summary of changes made in this release of the package.") -or ($metadata.releaseNotes -eq "`$description`$"))
+    {
+        $metadata.releaseNotes = $projectName
+    }
+
     
     Write-Host "开始更新依赖包"
     $dependencies = $metadata.SelectSingleNode("dependencies")
@@ -161,7 +180,6 @@ function Make($projectName, $projectPath)
             $metadata.RemoveChild($dependencies)
         }
         $document.Save($nuspecFile)
-        Write-Host "更新完成"
         return
     }
     if(-NOT $dependencies)
