@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>作者</authors>
+    <owners>所有者</owners>
+    <licenseUrl>http://www.xxx.com/license.html</licenseUrl>
+    <projectUrl>http://www.xxx.com/</projectUrl>
+    <iconUrl>http://www.xxx.com/icon.ico</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>$description$</releaseNotes>
+    <copyright>Copyright @ 2019</copyright>
+    <tags>Tag1 Tag2</tags>
+    <dependencies>
+      <group targetFramework="net471">
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.10.0" version="10.0.30319" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.TextManager.Interop" version="7.10.6070" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Imaging" version="15.0.26228" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Threading" version="15.0.240" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.8.0" version="8.0.50727" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.14.0.DesignTime" version="14.3.25407" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.CoreUtility" version="15.0.26228" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Threading.Analyzers" version="15.8.122" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.12.0" version="12.0.30110" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Framework" version="15.0.26228" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.TextManager.Interop.8.0" version="8.0.50727" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Validation" version="15.0.82" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.11.0" version="11.0.61030" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.OLE.Interop" version="7.10.6071" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.SDK.EmbedInteropTypes" version="15.0.10" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop" version="7.10.6071" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" version="14.3.25408" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VSSDK.BuildTools" version="15.9.3032" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.Interop.9.0" version="9.0.30729" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Utilities" version="15.0.26228" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.Shell.15.0" version="15.0.26228" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.VisualStudio.SDK.Analyzers" version="15.8.33" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

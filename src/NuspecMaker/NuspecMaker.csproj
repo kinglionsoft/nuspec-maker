@@ -55,7 +55,6 @@
     <Compile Include="MakeNuspecCommand.cs" />
     <Compile Include="MakeNuspecCommandPackage.cs" />
     <Compile Include="NuspecConfiguration.cs" />
-    <Compile Include="NuspecGenerator.cs" />
     <Compile Include="NuspecOption.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
