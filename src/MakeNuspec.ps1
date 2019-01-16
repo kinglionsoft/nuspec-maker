@@ -6,19 +6,26 @@
 
 param (
     [string]$nuget = "e:\tools\nuget.exe",
-    [string]$authors = "四川译讯信息科技有限公司",
-    [string]$owners = "四川译讯信息科技有限公司",
-    [string]$licenseUrl = "http://share.yx.com/license.html",
+    [string]$authors = "Eson",
+    [string]$owners = "",
+    [string]$licenseUrl = "",
     [string]$projectUrl = "http://tfs:8080/",
     [string]$iconUrl = "http://share.yx.com/nuget.png",
     [string]$copyright = "Copyright @ 2019",
     [string]$requireLicenseAcceptance = "false",
     [string]$ignore = "MigrationBackup,Test",
     [bool]$ignoreError = $false,
-    [string]$slnRoot = "D:\201807_Lib\Lib\",
+    [string]$slnRoot = "D:\201807_Core\Core\Lib\Lib.Log",
     [string]$pushSource = "http://tfs:8088/nuget",
+    [string]$apiKey = "yx1234",
     [string]$ignoreLowerVersion = $true
 )
+
+if ($apiKey -eq "")
+{
+    "@@ No NuGet server api key provided - so not pushing anything up."
+    exit 1
+}
 
 # 忽略项
 $splitChars = ",", " "
@@ -164,7 +171,7 @@ function Make($projectName, $projectPath)
          Write-Host "开始使用全局配置更新：$nuspecFile"
          $metadata.authors = $authors
          $metadata.owners = $owners
-         $metadata.license = $licenseUrl
+         $metadata.licenseUrl = $licenseUrl
          $metadata.projectUrl = $projectUrl
          $metadata.iconUrl = $iconUrl
          $metadata.copyright = $copyright
@@ -293,6 +300,32 @@ function CompareVersion($a, $b)
 	return 0
 }
 
+function Pack($projectName, $projectPath)
+{
+    Write-Host "开始打包：$projectName"    
+    $csproj =  [System.IO.Path]::Combine($projectPath, $projectName+ ".csproj");
+    $output = &$nuget pack $csproj -Properties Configuration=Release -OutputDirectory $projectPath -ForceEnglishOutput
+    
+    $pkg = ""
+    foreach($line in $output)
+    {
+        Write-Host $line
+
+        # Successfully created package 'D:\201807_Core\Core\Lib\Lib.Log\Lib.Log.1.1.0.nupkg'.
+        if($line.Contains("Successfully created package"))
+        {
+            $pkg = $line.Substring(30, $line.Length - 32); 
+        }
+    }
+    
+    return $pkg;
+}
+
+function Push($nupkg)
+{
+    &$nuget push $nupkg -Source $pushSource -apiKey $apiKey 
+}
+
 function Run()
 {
     FindNuget
@@ -333,6 +366,11 @@ function Run()
         else
         {
             Make $projectName $projectPath
+            $nupkg = Pack $projectName $projectPath 
+            if($nupkg -ne "")         
+            {
+                Push $nupkg
+            }
         }
         $i++
         Write-Host
