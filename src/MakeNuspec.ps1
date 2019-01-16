@@ -13,12 +13,16 @@ param (
     [string]$iconUrl = "http://share.yx.com/nuget.png",
     [string]$copyright = "Copyright @ 2019",
     [string]$requireLicenseAcceptance = "false",
-    [string]$ignore = "MigrationBackup",
+    [string]$ignore = "MigrationBackup,Test",
     [bool]$ignoreError = $false,
-    [string]$slnRoot = "D:\201807_Lib\Lib"
+    [string]$slnRoot = "D:\201807_Lib\Lib\",
+    [string]$pushSource = "http://tfs:8088/nuget",
+    [string]$ignoreLowerVersion = $true
 )
 
-$ignoreList = $ignore.Split(';')
+# 忽略项
+$splitChars = ",", " "
+$ignoreList = $ignore.Split($splitChars, [StringSplitOptions]::RemoveEmptyEntries)
 
 function MatchIgnore($projectName, $projectPath)
 {
@@ -28,7 +32,7 @@ function MatchIgnore($projectName, $projectPath)
         {
             return $true
         }
-        if ( [System.Text.RegularExpressions.Regex]::IsMatch($projectPath, ".*{$i}.*", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
+        if ([System.Text.RegularExpressions.Regex]::IsMatch($projectPath, ".*$i.*", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
         {
             return $true
         }
@@ -131,6 +135,19 @@ function GetVersion($projectName, $projectPath)
 function Make($projectName, $projectPath)
 {
     $nuspecFile = [System.IO.Path]::Combine($projectPath, $projectName+ ".nuspec");
+    $newVersion = GetVersion $projectName $projectPath
+
+    if(!(ValidateVersion $projectName $newVersion))
+    {
+        Write-Host "当前版本不高于服务器版本，放弃"
+        if(Test-Path $nuspecFile)
+        {
+            Write-Host "删除 $nuspecFile"
+            Remove-Item $nuspecFile
+        }
+        return
+    }
+
     $newNuspec = $false
 
     if(!(Test-Path $nuspecFile -PathType Leaf))
@@ -154,7 +171,7 @@ function Make($projectName, $projectPath)
          $metadata.requireLicenseAcceptance = $requireLicenseAcceptance
          
     }
-    $newVersion = GetVersion $projectName $projectPath
+   
     Write-Host "开始更新版本：$newVersion"
     $metadata.id = $projectName
     $metadata.title = $projectName
@@ -167,7 +184,6 @@ function Make($projectName, $projectPath)
     {
         $metadata.releaseNotes = $projectName
     }
-
     
     Write-Host "开始更新依赖包"
     $dependencies = $metadata.SelectSingleNode("dependencies")
@@ -217,6 +233,64 @@ function GetAllProjects()
     {
         throw "$slnRoot 不存在"
     }
+}
+
+# 检查包是否需要上传：版本未更新则不上传
+function ValidateVersion($nupkgName, $nupkgVersion)
+{	
+	Write-Host  "Current package is $nupkgName with version $nupkgVersion"
+	$serverReply = &$nuget list -Source $pushSource $nupkgName
+	Write-Host "Server replies:  $serverReply"
+	if ($serverReply.StartsWith($nupkgName))
+	{
+		$serverVersion = $serverReply.Split(' ')[1];
+		Write-Host "Server version is $serverVersion"
+		$c = CompareVersion -a $nupkgVersion -b $serverVersion 
+		if ($c -eq 1)
+		{
+			return $true
+		}
+		return $false
+	}		
+	return $true
+}
+
+function CompareVersion($a, $b)
+{
+	$va = $a.Split('.')
+	$vb = $b.Split('.')
+	$length = $va.Length
+	if ($vb.Length -gt $length)
+	{
+		$length = $b.Length
+	}
+	for ($i=0; $i -lt $length; $i++)
+	{
+		if ($i -ge $va.Length -and $i -lt $vb.Length)
+		{
+			# a < b
+			return -1 
+		}
+		
+		if ($i -ge $vb.Length -and $i -lt $va.Length)
+		{
+			# a > b
+			return 1
+		}
+		$ai = [int]$va[$i]
+		$bi = [int]$vb[$i]
+		if ($ai -lt $bi)
+		{
+			return -1
+		}
+		
+		if ($ai -gt $bi)
+		{
+			return 1
+		}
+    }
+	# a = b
+	return 0
 }
 
 function Run()
