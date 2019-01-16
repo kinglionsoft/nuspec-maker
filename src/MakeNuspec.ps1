@@ -7,7 +7,7 @@
 param (
     [string]$nuget = "e:\tools\nuget.exe",
     [string]$authors = "Eson",
-    [string]$owners = "",
+    [string]$owners = "Eson",
     [string]$licenseUrl = "",
     [string]$projectUrl = "http://tfs:8080/",
     [string]$iconUrl = "http://share.yx.com/nuget.png",
@@ -15,7 +15,7 @@ param (
     [string]$requireLicenseAcceptance = "false",
     [string]$ignore = "MigrationBackup,Test",
     [bool]$ignoreError = $false,
-    [string]$slnRoot = "D:\201807_Core\Core\Lib\Lib.Log",
+    [string]$slnRoot = "D:\github\file-store\src\FileStorage.SDK.Client",
     [string]$pushSource = "http://tfs:8088/nuget",
     [string]$apiKey = "yx1234",
     [string]$ignoreLowerVersion = $true
@@ -304,7 +304,7 @@ function Pack($projectName, $projectPath)
 {
     Write-Host "开始打包：$projectName"    
     $csproj =  [System.IO.Path]::Combine($projectPath, $projectName+ ".csproj");
-    $output = &$nuget pack $csproj -Properties Configuration=Release -OutputDirectory $projectPath -ForceEnglishOutput
+    $output = &$nuget pack $csproj -Properties Configuration=Release -OutputDirectory $projectPath -ForceEnglishOutput -NonInteractive
     
     $pkg = ""
     foreach($line in $output)
