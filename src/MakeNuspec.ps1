@@ -8,14 +8,14 @@ param (
     [string]$nuget = "e:\tools\nuget.exe",
     [string]$authors = "Eson",
     [string]$owners = "Eson",
-    [string]$licenseUrl = "",
+    [string]$licenseUrl = "http://share.yx.com/license.html",
     [string]$projectUrl = "http://tfs:8080/",
     [string]$iconUrl = "http://share.yx.com/nuget.png",
     [string]$copyright = "Copyright @ 2019",
     [string]$requireLicenseAcceptance = "false",
-    [string]$ignore = "MigrationBackup,Test",
+    [string]$ignore = "Test",
     [bool]$ignoreError = $false,
-    [string]$slnRoot = "D:\github\file-store\src\FileStorage.SDK.Client",
+    [string]$slnRoot = "D:\201807_Core\Core\Lib\Lib.Base",
     [string]$pushSource = "http://tfs:8088/nuget",
     [string]$apiKey = "yx1234",
     [string]$ignoreLowerVersion = $true
@@ -29,17 +29,24 @@ if ($apiKey -eq "")
 
 # 忽略项
 $splitChars = ",", " "
-$ignoreList = $ignore.Split($splitChars, [StringSplitOptions]::RemoveEmptyEntries)
+$allIgnores = $ignore.Split($splitChars, [StringSplitOptions]::RemoveEmptyEntries)
+$ignoreList = $allIgnores | where { -not $_.StartsWith("!") }
+$notIgnoreList = $allIgnores | where { $_.StartsWith("!") }
 
-function MatchIgnore($projectName, $projectPath)
+function MatchIgnore($csproj)
 {
+    foreach($i in $notIgnoreList)
+    {
+        $notIgnore = $i.SubString(1)
+        if(($csproj -match $notIgnore) -or ($csproj -like $notIgnore))
+        {
+            return $false
+        }
+    }
+
     foreach($i in $ignoreList)
     {
-        if ($i -eq $projectName )
-        {
-            return $true
-        }
-        if ([System.Text.RegularExpressions.Regex]::IsMatch($projectPath, ".*$i.*", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase))
+        if(($csproj -match $i) -or ($csproj -like $i))
         {
             return $true
         }
@@ -89,6 +96,7 @@ function GetDependencies($projectPath)
     $assetsJObject = Get-Content -Raw -Path $assets | ConvertFrom-Json
     
     [hashtable]$depends = @{}
+    # nuget 包
     $assetsJObject.project.frameworks | Get-ObjectMembers | foreach {
         if($_.Value.dependencies) 
         {
@@ -106,6 +114,34 @@ function GetDependencies($projectPath)
             $depends[$net] = $packages
         }
     }
+    # 项目引用
+    $projectFramework = $assetsJObject.project.restore.frameworks | Get-ObjectMembers | foreach {
+        $net = $_
+        [hashtable]$packages = @{}
+        $net.Value.projectReferences | Get-ObjectMembers | foreach {
+            $path = $_.Value.projectPath
+            $pName = [System.IO.Path]::GetFileNameWithoutExtension($path)
+            $pNamePath = [System.IO.Path]::GetDirectoryName($path)
+            $pVersion = GetVersion $pName $pNamePath
+            $packages[$pName] = $pVersion
+        }
+
+        if($packages.Count -gt 0)
+        {
+            if($depends[$net.Key] -and ($depends[$net.Key].Count -gt 0))
+            {                
+                foreach($p in $packages.Keys)
+                {
+                    $depends[$net.Key].Add($p, $packages[$p])
+                }  
+            }
+            else
+            {                
+                $depends[$net.Key] = $packages 
+            }
+        }
+    }
+
     return $depends
 }
 
@@ -139,7 +175,7 @@ function GetVersion($projectName, $projectPath)
     return "1.0.0"
 }
 
-function Make($projectName, $projectPath)
+function TryMake($projectName, $projectPath)
 {
     $nuspecFile = [System.IO.Path]::Combine($projectPath, $projectName+ ".nuspec");
     $newVersion = GetVersion $projectName $projectPath
@@ -152,7 +188,7 @@ function Make($projectName, $projectPath)
             Write-Host "删除 $nuspecFile"
             Remove-Item $nuspecFile
         }
-        return
+        return $false
     }
 
     $newNuspec = $false
@@ -165,7 +201,7 @@ function Make($projectName, $projectPath)
     }
 
     $document = [xml](Get-Content $nuspecFile -Encoding UTF8)
-    $metadata = $document.SelectSingleNode("/package/metadata")
+    $metadata = $document.SelectSingleNode("/*[name()='package']/*[name()='metadata']")
     if($newNuspec) 
     {
          Write-Host "开始使用全局配置更新：$nuspecFile"
@@ -175,13 +211,25 @@ function Make($projectName, $projectPath)
          $metadata.projectUrl = $projectUrl
          $metadata.iconUrl = $iconUrl
          $metadata.copyright = $copyright
-         $metadata.requireLicenseAcceptance = $requireLicenseAcceptance
-         
+         $metadata.requireLicenseAcceptance = $requireLicenseAcceptance         
     }
    
     Write-Host "开始更新版本：$newVersion"
     $metadata.id = $projectName
-    $metadata.title = $projectName
+    if(-NOT $metadata.title)
+    {
+         $title = $document.CreateElement("title")
+         $title.InnerText = $projectName
+         $metadata.AppendChild($title) > $null
+    }
+    elseif($metadata.title.InnerText)
+    {
+        $metadata.title.InnerText = $projectName
+    }
+    else
+    {
+        $metadata.title = $projectName
+    }
     $metadata.version = $newVersion
     if($metadata.description -eq "`$description`$")
     {
@@ -193,7 +241,7 @@ function Make($projectName, $projectPath)
     }
     
     Write-Host "开始更新依赖包"
-    $dependencies = $metadata.SelectSingleNode("dependencies")
+    $dependencies = $metadata.SelectSingleNode("*[name()='dependencies']")
     $pkgList = GetDependencies $projectPath
     if($pkgList.Count -eq 0 )
     {
@@ -203,12 +251,12 @@ function Make($projectName, $projectPath)
             $metadata.RemoveChild($dependencies)
         }
         $document.Save($nuspecFile)
-        return
+        return $true
     }
     if(-NOT $dependencies)
     {
         $metadata.AppendChild($document.CreateElement("dependencies")) > $null
-        $dependencies = $metadata.SelectSingleNode("dependencies")
+        $dependencies = $metadata.SelectSingleNode("*[name()='dependencies']")
     }
     else
     {
@@ -232,6 +280,7 @@ function Make($projectName, $projectPath)
     }     
     
     $document.Save($nuspecFile)
+    return $true
 }
 
 function GetAllProjects()
@@ -336,7 +385,6 @@ function Run()
     }
 
     $projects = Get-ChildItem -Path $slnRoot -Include *.csproj -Recurse
-    
     if(-not $projects)
     {
         Write-Host "$slnRoot 目录下没有找到项目文件(*.csproj)"
@@ -359,13 +407,12 @@ function Run()
         $projectName = [System.IO.Path]::GetFileNameWithoutExtension($_)
         $projectPath = $_.DirectoryName
         
-        if((MatchIgnore $projectName $projectPath)) 
+        if((MatchIgnore $_.FullName)) 
         {
             Write-Host "$_ 满足排除条件，跳过"
         }
-        else
-        {
-            Make $projectName $projectPath
+        elseif(TryMake $projectName $projectPath)
+        {            
             $nupkg = Pack $projectName $projectPath 
             if($nupkg -ne "")         
             {
