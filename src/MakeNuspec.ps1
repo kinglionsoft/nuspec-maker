@@ -266,7 +266,8 @@ function TryMake($projectName, $projectPath)
     foreach($net in $pkgList.Keys)
     {
         $group = $document.CreateElement("group")
-        $group.SetAttribute("targetFramework", $net); # .NETStandard2.0
+        $frame = MapFramework $net
+        $group.SetAttribute("targetFramework", $frame); # .NETStandard2.0
         foreach($pkg in $pkgList[$net].Keys)
         {
             Write-Host "添加 $pkg"
@@ -283,6 +284,37 @@ function TryMake($projectName, $projectPath)
     return $true
 }
 
+function MapFramework($net)
+{
+    switch($net)
+    {        
+        "netstandard1.0" { ".NETStandard1.0" }
+        "netstandard1.1" { ".NETStandard1.1" }
+        "netstandard1.2" { ".NETStandard1.2" }
+        "netstandard1.3" { ".NETStandard1.3" }
+        "netstandard1.4" { ".NETStandard1.4" }
+        "netstandard1.5" { ".NETStandard1.5" }
+        "netstandard1.6" { ".NETStandard1.6" }
+        "netstandard2.0" { ".NETStandard2.0" }
+        "netcoreapp1.0"  { ".NETCoreApp1.0" }
+        "netcoreapp1.1"  { ".NETCoreApp1.1" }
+        "netcoreapp2.0"  { ".NETCoreApp2.0" }
+        "netcoreapp2.1"  { ".NETCoreApp2.1" }
+        "netcoreapp2.2"  { ".NETCoreApp2.2" }
+        "netcoreapp3.0"  { ".NETCoreApp3.0" }
+        "net45"          { ".NETFramework4.5" }
+        "net451"         { ".NETFramework4.5.1" }
+        "net452"         { ".NETFramework4.5.2" }
+        "net46"          { ".NETFramework4.6" }
+        "net461"         { ".NETFramework4.6.1" }
+        "net462"         { ".NETFramework4.6.2" }
+        "net471"         { ".NETFramework4.7.1" }
+        "net472"         { ".NETFramework4.7.2" }
+    }
+
+    return $net
+}
+
 function GetAllProjects()
 {
     if(!(Test-Path $slnRoot))
@@ -297,7 +329,7 @@ function ValidateVersion($nupkgName, $nupkgVersion)
 	Write-Host  "Current package is $nupkgName with version $nupkgVersion"
 	$serverReply = &$nuget list -Source $pushSource $nupkgName
 	Write-Host "Server replies:  $serverReply"
-	if ($serverReply.StartsWith($nupkgName))
+	if ($serverReply.StartsWith($nupkgName+' '))
 	{
 		$serverVersion = $serverReply.Split(' ')[1];
 		Write-Host "Server version is $serverVersion"
@@ -411,12 +443,16 @@ function Run()
         {
             Write-Host "$_ 满足排除条件，跳过"
         }
+        elseif(!(Test-Path ([IO.Path]::Combine($projectPath,"obj","project.assets.json"))))
+        {
+             Write-Host "project.assets.json 不存在，未生成项目，跳过"
+        }
         elseif(TryMake $projectName $projectPath)
         {            
             $nupkg = Pack $projectName $projectPath 
             if($nupkg -ne "")         
             {
-                Push $nupkg
+                #Push $nupkg
             }
         }
         $i++
