@@ -87,7 +87,7 @@ function Get-ObjectMembers {
 
 function GetDependencies($projectPath) 
 {
-    $assets = [IO.Path]::Combine($projectPath,"obj","project.assets.json")
+    $assets = [System.IO.Path]::Combine($projectPath,"obj","project.assets.json")
     if(!(Test-Path $assets))
     {
         Write-Host "$assets 不存在，忽略"
@@ -96,51 +96,34 @@ function GetDependencies($projectPath)
     $assetsJObject = Get-Content -Raw -Path $assets | ConvertFrom-Json
     
     [hashtable]$depends = @{}
-    # nuget 包
-    $assetsJObject.project.frameworks | Get-ObjectMembers | foreach {
-        if($_.Value.dependencies) 
+
+    $assetsJObject.projectFileDependencyGroups | Get-ObjectMembers | foreach {
+        $frameMatch = [Regex]::Match($_.Key, '(?<frame>.*),Version=(?<version>.*)')
+        if([Regex]::IsMatch($_.Key, '.*,Version=v.*'))
         {
-            $net = $_.Key
+            $framework = $_.Key.Replace(',Version=v', '')
             [hashtable]$packages = @{}
-            $_.Value.dependencies | foreach {
-                $_ | Get-ObjectMembers | foreach {
-                    $pkg = $_.Key
-                    if($_.Value.target -eq "Package") {
-                        $version = $_.Value.version.Substring(1, $_.Value.version.IndexOf(',') - 1)
-                        $packages[$pkg]=$version
+
+            foreach($p in $_.Value)
+            {
+                $packageMatch = [Regex]::Match($p, '(?<name>.+) >= (((?<min>.+) <= (?<max>.+))|(?<min1>.+))');
+                if($packageMatch.Success)
+                {
+                    $name = $packageMatch.Groups['name'].Value
+                    if($packageMatch.Groups['min'].Success)
+                    {
+                        $packages[$name] = '[' + $packageMatch.Groups['min'].Value + ',' + $packageMatch.Groups['max'].Value + ']'
+                    }
+                    else
+                    {
+                        $packages[$name] = $packageMatch.Groups['min1'].Value
                     }
                 }
             }
-            $depends[$net] = $packages
+            
+            $depends[$framework] = $packages
         }
-    }
-    # 项目引用
-    $projectFramework = $assetsJObject.project.restore.frameworks | Get-ObjectMembers | foreach {
-        $net = $_
-        [hashtable]$packages = @{}
-        $net.Value.projectReferences | Get-ObjectMembers | foreach {
-            $path = $_.Value.projectPath
-            $pName = [System.IO.Path]::GetFileNameWithoutExtension($path)
-            $pNamePath = [System.IO.Path]::GetDirectoryName($path)
-            $pVersion = GetVersion $pName $pNamePath
-            $packages[$pName] = $pVersion
-        }
-
-        if($packages.Count -gt 0)
-        {
-            if($depends[$net.Key] -and ($depends[$net.Key].Count -gt 0))
-            {                
-                foreach($p in $packages.Keys)
-                {
-                    $depends[$net.Key].Add($p, $packages[$p])
-                }  
-            }
-            else
-            {                
-                $depends[$net.Key] = $packages 
-            }
-        }
-    }
+    }    
 
     return $depends
 }
@@ -239,6 +222,10 @@ function TryMake($projectName, $projectPath)
     {
         $metadata.releaseNotes = $projectName
     }
+    if($metadata.tags -eq "Tag1 Tag2")
+    {
+        $metadata.RemoveChild($metadata.SelectSingleNode("*[name()='tags']"))
+    }
     
     Write-Host "开始更新依赖包"
     $dependencies = $metadata.SelectSingleNode("*[name()='dependencies']")
@@ -266,7 +253,7 @@ function TryMake($projectName, $projectPath)
     foreach($net in $pkgList.Keys)
     {
         $group = $document.CreateElement("group")
-        $frame = MapFramework $net
+        $frame = $net
         $group.SetAttribute("targetFramework", $frame); # .NETStandard2.0
         foreach($pkg in $pkgList[$net].Keys)
         {
@@ -452,7 +439,7 @@ function Run()
             $nupkg = Pack $projectName $projectPath 
             if($nupkg -ne "")         
             {
-                #Push $nupkg
+                Push $nupkg
             }
         }
         $i++
