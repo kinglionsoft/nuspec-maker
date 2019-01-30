@@ -6,6 +6,7 @@
 
 param (
     [string]$nuget = "e:\tools\nuget.exe",
+    [string]$msbuild = "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\MSBuild\15.0\Bin\MSBuild.exe",
     [string]$authors = "Eson",
     [string]$owners = "Eson",
     [string]$licenseUrl = "http://share.yx.com/license.html",
@@ -387,6 +388,11 @@ function Pack($projectName, $projectPath)
     }
     
     return $pkg;
+}
+
+function MsbuildPack($csproj)
+{
+
 }
 
 function Push($nupkg)
